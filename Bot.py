@@ -55,7 +55,7 @@ async def fetch_gallery(update: Update, context):
 
         image_paths = []
         for index, img_url in enumerate(images):
-            filename = os.path.join(DOWNLOAD_DIR, f"image_{index+1}.jpg")
+            filename = os.path.join(DOWNLOAD_DIR, f"image_{index+1:04d}.jpg")  # Fixed naming for sorting
             try:
                 img_data = requests.get(img_url, timeout=10).content
                 with open(filename, "wb") as img_file:
