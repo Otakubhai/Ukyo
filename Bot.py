@@ -38,7 +38,7 @@ async def fetch_gallery(update: Update, context):
     """Handles downloading and sending images from a Multporn gallery."""
     url = update.message.text.strip()
 
-    if not url.startswith("https://multporn.net/comics/"):
+    if not url.startswith("https://multporn.net/"):
         await update.message.reply_text("Invalid URL. Please send a valid Multporn.net link.")
         return
 
