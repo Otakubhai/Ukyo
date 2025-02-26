@@ -1,61 +1,73 @@
 import os
-import subprocess
+import requests
+from bs4 import BeautifulSoup
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler
 
-# Ensure dependencies are installed
-try:
-    import requests
-    from bs4 import BeautifulSoup
-    from telegram import Bot, Update
-    from telegram.ext import Application, CommandHandler, MessageHandler, filters
-except ImportError:
-    subprocess.run(["pip", "install", "--upgrade", "pip"])
-    subprocess.run(["pip", "install", "-r", "requirements.txt"])
-
-    # Retry imports after installation
-    import requests
-    from bs4 import BeautifulSoup
-    from telegram import Bot, Update
-    from telegram.ext import Application, CommandHandler, MessageHandler, filters
-
-from pdf_generator import create_pdf  # Import PDF function
-
+# Fetch bot token
 TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("BOT_TOKEN is not set in environment variables.")
 
-bot = Bot(token=TOKEN)
+# Folder to store images
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# Define conversation states
+WAITING_FOR_NUMBER = 1
+
+# Store user preferences temporarily
+user_requests = {}
+
 async def start(update: Update, context):
+    """Handles the /start command"""
     await update.message.reply_text("Send me a Multporn.net link to download images.")
 
-async def fetch_gallery(update: Update, context):
+async def ask_image_limit(update: Update, context):
+    """Asks the user how many images they want to download."""
     url = update.message.text.strip()
 
-    if not url.startswith("https://multporn.net/comics/") and not url.startswith("https://multporn.net/hentai_manga/"):
-        await update.message.reply_text("Invalid URL. Please send a valid Multporn.net manga link.")
-        return
+    if not url.startswith("https://multporn.net/comics/"):
+        await update.message.reply_text("Invalid URL. Please send a valid Multporn.net link.")
+        return ConversationHandler.END
 
-    await update.message.reply_text(f"Fetching images from: {url}")
+    # Store the URL for the user
+    user_requests[update.message.chat_id] = {"url": url}
 
+    await update.message.reply_text("How many images do you want to download? (Enter a number)")
+    return WAITING_FOR_NUMBER
+
+async def fetch_gallery(update: Update, context):
+    """Fetch images from the gallery with a limit set by the user."""
     try:
+        num_images = int(update.message.text.strip())
+        chat_id = update.message.chat_id
+
+        if chat_id not in user_requests:
+            await update.message.reply_text("No URL found. Please send the link again.")
+            return ConversationHandler.END
+
+        url = user_requests[chat_id]["url"]
+        await update.message.reply_text(f"Fetching up to {num_images} images from: {url}")
+
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Fetch all images (No filtering)
+        # Extract all images
         images = [img.get("src") for img in soup.find_all("img") if img.get("src")]
 
         if not images:
             await update.message.reply_text("No images found on this page.")
-            return
+            return ConversationHandler.END
 
-        await update.message.reply_text(f"Found {len(images)} images. Downloading...")
+        # Apply limit
+        images = images[:num_images]
 
+        await update.message.reply_text(f"Downloading {len(images)} images...")
+
+        # Download images
         image_paths = []
         for index, img_url in enumerate(images):
-            filename = os.path.join(DOWNLOAD_DIR, f"image_{index+1:04d}.jpg")  # Fixed naming for sorting
+            filename = os.path.join(DOWNLOAD_DIR, f"image_{index+1:03}.jpg")
             try:
                 img_data = requests.get(img_url, timeout=10).content
                 with open(filename, "wb") as img_file:
@@ -66,26 +78,46 @@ async def fetch_gallery(update: Update, context):
 
         if not image_paths:
             await update.message.reply_text("Failed to download images.")
-            return
+            return ConversationHandler.END
 
         await update.message.reply_text("Uploading images to Telegram...")
-        for img_path in image_paths:
+
+        # Send images
+        for img_path in sorted(image_paths):  # Ensure correct order
             await update.message.reply_document(document=open(img_path, "rb"))
 
-        await update.message.reply_text("All images uploaded! Creating a PDF...")
-        await create_pdf(update, context)
+        # Generate and send PDF
+        from pdf_generator import create_pdf
+        pdf_path = os.path.join(DOWNLOAD_DIR, "output.pdf")
+        create_pdf(image_paths, pdf_path)
 
+        await update.message.reply_document(document=open(pdf_path, "rb"))
+        await update.message.reply_text("PDF uploaded successfully!")
+
+    except ValueError:
+        await update.message.reply_text("Invalid number. Please enter a valid number.")
     except requests.exceptions.RequestException as e:
         await update.message.reply_text(f"Error: {str(e)}")
 
+    return ConversationHandler.END
+
 async def cancel(update: Update, context):
+    """Handles /cancel command"""
     await update.message.reply_text("Process canceled.")
+    return ConversationHandler.END
 
 def main():
+    """Start the bot."""
     app = Application.builder().token(TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, ask_image_limit)],
+        states={WAITING_FOR_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_gallery)]},
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("cancel", cancel))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_gallery))
+    app.add_handler(conv_handler)
 
     print("Bot is running...")
     app.run_polling()
