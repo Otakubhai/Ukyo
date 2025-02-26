@@ -1,27 +1,29 @@
 import os
-import sys
 import subprocess
 
-# Install dependencies if not available
-def install_dependencies():
-    packages = ["requests", "beautifulsoup4", "python-telegram-bot"]
-    for package in packages:
-        try:
-            __import__(package)
-        except ImportError:
-            print(f"Installing {package}...")
-            subprocess.run([sys.executable, "-m", "pip", "install", package], check=True)
+# Fetch the bot token from environment variables
+TOKEN = os.getenv("BOT_TOKEN")
 
-install_dependencies()
+if not TOKEN:
+    raise ValueError("BOT_TOKEN is not set in environment variables.")
 
-# Now import the libraries after installing them
-import requests
-from bs4 import BeautifulSoup
-from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+# Automatically install dependencies if missing
+try:
+    import requests
+    from bs4 import BeautifulSoup
+    from telegram import Bot, Update
+    from telegram.ext import Application, CommandHandler, MessageHandler, filters
+except ImportError:
+    subprocess.run(["pip", "install", "--upgrade", "pip"])
+    subprocess.run(["pip", "install", "requests", "beautifulsoup4", "python-telegram-bot"])
 
-# Bot token (replace with your own)
-TOKEN = "7373649479:AAE_YWsMvbOmURGIOuRtv-o0S1chuYiBnm4"
+    # Retry import after installation
+    import requests
+    from bs4 import BeautifulSoup
+    from telegram import Bot, Update
+    from telegram.ext import Application, CommandHandler, MessageHandler, filters
+
+# Initialize bot
 bot = Bot(token=TOKEN)
 
 # Folder to store images
