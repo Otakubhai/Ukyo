@@ -44,13 +44,11 @@ async def fetch_gallery(update: Update, context):
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
-        images = [
-            img.get("src") for img in soup.find_all("img")
-            if img.get("src") and "multporn.net" in img.get("src") and img.get("src").endswith((".jpg", ".png"))
-        ]
+        # Fetch all images (No filtering)
+        images = [img.get("src") for img in soup.find_all("img") if img.get("src")]
 
         if not images:
-            await update.message.reply_text("No manga images found on this page.")
+            await update.message.reply_text("No images found on this page.")
             return
 
         await update.message.reply_text(f"Found {len(images)} images. Downloading...")
