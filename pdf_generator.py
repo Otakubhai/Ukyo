@@ -9,6 +9,7 @@ PDF_PATH = os.path.join(DOWNLOAD_DIR, "manga.pdf")
 async def create_pdf(update: Update, context: CallbackContext):
     await update.message.reply_text("Creating PDF...")
 
+    # Sort images numerically to maintain correct order
     image_files = sorted(
         [os.path.join(DOWNLOAD_DIR, f) for f in os.listdir(DOWNLOAD_DIR) if f.endswith((".jpg", ".png"))]
     )
