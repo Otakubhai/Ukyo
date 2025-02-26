@@ -1,7 +1,7 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from telegram import Bot, Update
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler
 
 # Fetch bot token
@@ -25,7 +25,8 @@ async def ask_image_limit(update: Update, context):
     """Asks the user how many images they want to download."""
     url = update.message.text.strip()
 
-    if not url.startswith("https://multporn.net/comics/"):
+    # Allow any Multporn link
+    if "multporn.net" not in url:
         await update.message.reply_text("Invalid URL. Please send a valid Multporn.net link.")
         return ConversationHandler.END
 
@@ -53,7 +54,16 @@ async def fetch_gallery(update: Update, context):
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Extract all images
-        images = [img.get("src") for img in soup.find_all("img") if img.get("src")]
+        images = []
+        for img in soup.find_all("img"):
+            img_url = img.get("src")
+            if img_url:
+                if img_url.startswith("//"):  # Convert protocol-relative URLs
+                    img_url = "https:" + img_url
+                elif img_url.startswith("/"):  # Convert relative URLs
+                    base_url = "/".join(url.split("/")[:3])
+                    img_url = base_url + img_url
+                images.append(img_url)
 
         if not images:
             await update.message.reply_text("No images found on this page.")
@@ -88,11 +98,7 @@ async def fetch_gallery(update: Update, context):
 
         # Generate and send PDF
         from pdf_generator import create_pdf
-        pdf_path = os.path.join(DOWNLOAD_DIR, "output.pdf")
-        create_pdf(image_paths, pdf_path)
-
-        await update.message.reply_document(document=open(pdf_path, "rb"))
-        await update.message.reply_text("PDF uploaded successfully!")
+        await create_pdf(update, context)  # Ensure this is awaited if it's an async function
 
     except ValueError:
         await update.message.reply_text("Invalid number. Please enter a valid number.")
