@@ -28,19 +28,16 @@ async def ask_image_limit(update: Update, context):
     """Asks the user how many images they want to download."""
     url = update.message.text.strip()
 
-    # Allow any Multporn link
     if "multporn.net" not in url:
         await update.message.reply_text("Invalid URL. Please send a valid Multporn.net link.")
         return ConversationHandler.END
 
-    # Store the URL for the user
     user_requests[update.message.chat_id] = {"url": url}
-
     await update.message.reply_text("How many images do you want to download? (Enter a number)")
     return WAITING_FOR_NUMBER
 
 async def fetch_gallery(update: Update, context):
-    """Fetch images from the gallery with a limit set by the user."""
+    """Fetch and download images with a limit set by the user."""
     try:
         num_images = int(update.message.text.strip())
         chat_id = update.message.chat_id
@@ -56,14 +53,13 @@ async def fetch_gallery(update: Update, context):
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Extract all images
         images = []
         for img in soup.find_all("img"):
             img_url = img.get("src")
             if img_url:
                 if img_url.startswith("//"):  # Convert protocol-relative URLs
                     img_url = "https:" + img_url
-                elif img_url.startswith("/"):  # Convert relative URLs
+                elif img_url.startswith("/"):
                     base_url = "/".join(url.split("/")[:3])
                     img_url = base_url + img_url
                 images.append(img_url)
@@ -72,12 +68,9 @@ async def fetch_gallery(update: Update, context):
             await update.message.reply_text("No images found on this page.")
             return ConversationHandler.END
 
-        # Apply limit
         images = images[:num_images]
-
         await update.message.reply_text(f"Downloading {len(images)} images...")
 
-        # Download images
         image_paths = []
         for index, img_url in enumerate(images):
             filename = os.path.join(DOWNLOAD_DIR, f"image_{index+1:03}.jpg")
@@ -95,12 +88,10 @@ async def fetch_gallery(update: Update, context):
 
         await update.message.reply_text("Uploading images to Telegram...")
 
-        # Send images
-        for img_path in sorted(image_paths):  # Ensure correct order
+        for img_path in sorted(image_paths):
             with open(img_path, "rb") as img_file:
                 await update.message.reply_document(document=img_file)
 
-        # Generate and send PDF
         pdf_path = os.path.join(DOWNLOAD_DIR, "output.pdf")
         create_pdf(image_paths, pdf_path)
 
