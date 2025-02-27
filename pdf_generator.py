@@ -5,21 +5,30 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 
 def create_pdf(image_paths, pdf_path):
-    """Creates a PDF from images without watermark or embedded link."""
+    """Creates a PDF from images without watermark or embedded link, maintaining aspect ratio."""
     if not image_paths:
         print("No images found to create a PDF.")
         return
 
-    # Set the PDF page size to letter format
     c = canvas.Canvas(pdf_path, pagesize=letter)
-    width, height = letter
+    page_width, page_height = letter
 
     for img_path in image_paths:
         try:
             with Image.open(img_path) as img:
-                img.thumbnail((width, height))  # Resize to fit page while maintaining aspect ratio
+                img_width, img_height = img.size
+
+                # Calculate scaling factor to maintain aspect ratio
+                scale_factor = min(page_width / img_width, page_height / img_height)
+                new_width = img_width * scale_factor
+                new_height = img_height * scale_factor
+
+                # Center image on the page
+                x_position = (page_width - new_width) / 2
+                y_position = (page_height - new_height) / 2
+
                 img_reader = ImageReader(img)
-                c.drawImage(img_reader, 0, 0, width, height)  # Place image on page
+                c.drawImage(img_reader, x_position, y_position, new_width, new_height)
                 c.showPage()
         except Exception as e:
             print(f"Skipping image {img_path} due to error: {e}")
