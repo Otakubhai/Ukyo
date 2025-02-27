@@ -28,17 +28,20 @@ async def create_pdf(update: Update, context: CallbackContext):
             img = Image.open(img_path).convert("RGB")
             draw = ImageDraw.Draw(img)
 
-            # Load a basic font (PIL default)
+            # Load font
             try:
-                font = ImageFont.truetype("arial.ttf", 20)  # Adjust font size
+                font = ImageFont.truetype("arial.ttf", 20)  # Adjust size as needed
             except IOError:
-                font = ImageFont.load_default()  # Fallback if arial.ttf is unavailable
+                font = ImageFont.load_default()  # Use default font if arial.ttf is missing
 
             # Get image size
             img_width, img_height = img.size
 
-            # Set watermark position (bottom-right corner)
-            text_width, text_height = draw.textsize(WATERMARK_TEXT, font=font)
+            # Get text bounding box for accurate placement
+            bbox = draw.textbbox((0, 0), WATERMARK_TEXT, font=font)
+            text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+            # Position watermark at bottom-right corner
             x = img_width - text_width - 20
             y = img_height - text_height - 20
 
@@ -47,7 +50,7 @@ async def create_pdf(update: Update, context: CallbackContext):
 
             images.append(img)
 
-        # Save images as PDF
+        # Save as PDF
         images[0].save(PDF_PATH, save_all=True, append_images=images[1:])
     except Exception as e:
         await update.message.reply_text(f"Error creating PDF: {str(e)}")
