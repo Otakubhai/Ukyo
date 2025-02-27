@@ -1,64 +1,68 @@
 import os
 from PIL import Image, ImageDraw, ImageFont
-from telegram import Update
-from telegram.ext import CallbackContext
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
 
-# Define directories
 DOWNLOAD_DIR = "downloads"
 PDF_PATH = os.path.join(DOWNLOAD_DIR, "manga.pdf")
 
-# Watermark text
-WATERMARK_TEXT = "🔥 Powered by t.me/Den_of_Sins"
-
-async def create_pdf(update: Update, context: CallbackContext):
-    await update.message.reply_text("Creating PDF...")
-
-    # Sort images numerically to maintain correct order
-    image_files = sorted(
-        [os.path.join(DOWNLOAD_DIR, f) for f in os.listdir(DOWNLOAD_DIR) if f.endswith((".jpg", ".png"))]
-    )
-
-    if not image_files:
-        await update.message.reply_text("No images found to create a PDF.")
+def create_pdf(image_paths, pdf_path):
+    """Creates a PDF from images with a watermark and an embedded link."""
+    if not image_paths:
+        print("No images found to create a PDF.")
         return
 
+    # Define watermark text and link
+    watermark_text = "🔥 Powered by t.me/Den_of_Sins"
+    link_url = "https://t.me/Den_of_Sins"
+
+    # Load a bold font for better visibility
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change if needed
+    font_size = 24
+
+    # Check if font exists, otherwise use default
     try:
-        images = []
-        for img_path in image_files:
+        font = ImageFont.truetype(font_path, font_size)
+    except IOError:
+        font = ImageFont.load_default()
+
+    # Create the PDF
+    c = canvas.Canvas(pdf_path, pagesize=letter)
+    width, height = letter
+
+    for img_path in image_paths:
+        try:
             img = Image.open(img_path).convert("RGB")
-            draw = ImageDraw.Draw(img)
-
-            # Load font
-            try:
-                font = ImageFont.truetype("arial.ttf", 20)  # Adjust size as needed
-            except IOError:
-                font = ImageFont.load_default()  # Use default font if arial.ttf is missing
-
-            # Get image size
             img_width, img_height = img.size
 
-            # Get text bounding box for accurate placement
-            bbox = draw.textbbox((0, 0), WATERMARK_TEXT, font=font)
-            text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            # Resize image to fit within letter page size while maintaining aspect ratio
+            aspect = min(width / img_width, height / img_height)
+            new_width = int(img_width * aspect)
+            new_height = int(img_height * aspect)
 
-            # Position watermark at bottom-right corner
-            x = img_width - text_width - 20
-            y = img_height - text_height - 20
+            img = img.resize((new_width, new_height))
 
             # Add watermark
-            draw.text((x, y), WATERMARK_TEXT, fill=(255, 255, 255), font=font)
+            draw = ImageDraw.Draw(img)
+            text_width, text_height = draw.textbbox((0, 0), watermark_text, font=font)[2:]
+            x = new_width - text_width - 20  # Bottom-right corner
+            y = new_height - text_height - 20
+            draw.text((x, y), watermark_text, font=font, fill="black")
 
-            images.append(img)
+            # Save temp image with watermark
+            temp_path = os.path.join(DOWNLOAD_DIR, "temp.jpg")
+            img.save(temp_path)
 
-        # Save as PDF
-        images[0].save(PDF_PATH, save_all=True, append_images=images[1:])
-    except Exception as e:
-        await update.message.reply_text(f"Error creating PDF: {str(e)}")
-        return
+            # Draw image on PDF
+            c.drawImage(ImageReader(temp_path), (width - new_width) / 2, (height - new_height) / 2, new_width, new_height)
 
-    await update.message.reply_text("Uploading PDF...")
-    try:
-        await update.message.reply_document(document=open(PDF_PATH, "rb"))
-        await update.message.reply_text("PDF uploaded successfully!")
-    except Exception as e:
-        await update.message.reply_text(f"Error uploading PDF: {str(e)}")
+            # Add clickable link
+            c.linkURL(link_url, (x, y, x + text_width, y + text_height), thickness=1)
+
+            c.showPage()
+        except Exception as e:
+            print(f"Error processing image {img_path}: {str(e)}")
+
+    c.save()
+    print("PDF created successfully!")
