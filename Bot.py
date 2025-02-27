@@ -4,6 +4,9 @@ from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler
 
+# Import PDF generation function
+from pdf_generator import create_pdf
+
 # Fetch bot token
 TOKEN = os.getenv("BOT_TOKEN")
 
@@ -94,16 +97,23 @@ async def fetch_gallery(update: Update, context):
 
         # Send images
         for img_path in sorted(image_paths):  # Ensure correct order
-            await update.message.reply_document(document=open(img_path, "rb"))
+            with open(img_path, "rb") as img_file:
+                await update.message.reply_document(document=img_file)
 
         # Generate and send PDF
-        from pdf_generator import create_pdf
-        await create_pdf(update, context)  # Ensure this is awaited if it's an async function
+        pdf_path = os.path.join(DOWNLOAD_DIR, "output.pdf")
+        create_pdf(image_paths, pdf_path)
+
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as pdf_file:
+                await update.message.reply_document(document=pdf_file, caption="Here is your PDF!")
 
     except ValueError:
         await update.message.reply_text("Invalid number. Please enter a valid number.")
     except requests.exceptions.RequestException as e:
         await update.message.reply_text(f"Error: {str(e)}")
+    except Exception as e:
+        await update.message.reply_text(f"Unexpected error: {str(e)}")
 
     return ConversationHandler.END
 
