@@ -93,11 +93,13 @@ async def fetch_gallery(update: Update, context):
                 await update.message.reply_document(document=img_file)
 
         pdf_path = os.path.join(DOWNLOAD_DIR, "output.pdf")
-        create_pdf(image_paths, pdf_path)
+        pdf_created = create_pdf(image_paths, pdf_path)
 
-        if os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as pdf_file:
+        if pdf_created:
+            async with open(pdf_path, "rb") as pdf_file:
                 await update.message.reply_document(document=pdf_file, caption="Here is your PDF!")
+        else:
+            await update.message.reply_text("Failed to create PDF.")
 
     except ValueError:
         await update.message.reply_text("Invalid number. Please enter a valid number.")
