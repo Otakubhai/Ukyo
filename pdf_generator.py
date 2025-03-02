@@ -1,48 +1,39 @@
 import os
-from PIL import Image
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.utils import ImageReader
+from PIL import Image
 
-MAX_IMAGES_PER_PDF = 20  # Split PDFs if more than 20 images
-
-def create_pdf(image_paths, output_pdf):
-    """Creates PDFs from images while maintaining aspect ratio and optimizing memory usage."""
+def create_pdf(image_paths, output_pdf_path):
+    """Generates a PDF from a list of images."""
     if not image_paths:
-        print("No images to create a PDF.")
-        return None
+        print("No images to add to PDF.")
+        return None  # Return None if no images are available
 
-    pdf_files = []  # Stores paths of all generated PDFs
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
-    # Split into multiple PDFs if needed
-    for i in range(0, len(image_paths), MAX_IMAGES_PER_PDF):
-        chunk = image_paths[i:i + MAX_IMAGES_PER_PDF]
-        pdf_part_path = f"{output_pdf.rstrip('.pdf')}_{i//MAX_IMAGES_PER_PDF + 1}.pdf"
+    pdf = canvas.Canvas(output_pdf_path, pagesize=letter)
 
-        c = canvas.Canvas(pdf_part_path, pagesize=letter)
-        page_width, page_height = letter
+    for img_path in image_paths:
+        try:
+            img = Image.open(img_path)
+            width, height = img.size  # Maintain original aspect ratio
 
-        for img_path in chunk:
-            try:
-                with Image.open(img_path) as img:
-                    # Convert to RGB (fixes issues with transparency in PNGs)
-                    img = img.convert("RGB")
+            # Scale image to fit within the page size
+            max_width = 500
+            max_height = 700
+            scale = min(max_width / width, max_height / height)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
 
-                    # Resize if image is too large
-                    img.thumbnail((page_width, page_height), Image.LANCZOS)
+            pdf.drawInlineImage(img_path, 50, 750 - new_height, width=new_width, height=new_height)
+            pdf.showPage()
+        except Exception as e:
+            print(f"Error adding image {img_path}: {e}")
 
-                    # Center image on page
-                    img_width, img_height = img.size
-                    x_position = (page_width - img_width) / 2
-                    y_position = (page_height - img_height) / 2
+    pdf.save()
 
-                    img_reader = ImageReader(img)
-                    c.drawImage(img_reader, x_position, y_position, img_width, img_height)
-                    c.showPage()
-            except Exception as e:
-                print(f"Skipping image {img_path} due to error: {e}")
-
-        c.save()
-        pdf_files.append(pdf_part_path)
-
-    return pdf_files  # Returns list of PDFs generated
+    if os.path.exists(output_pdf_path):
+        return output_pdf_path  # Return the correct file path
+    else:
+        return None  # If the file is missing, return None
