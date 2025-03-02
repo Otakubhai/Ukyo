@@ -1,7 +1,6 @@
-requests==2.31.0
-beautifulsoup4==4.12.3
-python-telegram-bot==20.6
-Pillow==10.2.0
-reportlab==3.6.13
-# Added memory-profiler for debugging (optional)
-# memory-profiler==0.61.0
+python-telegram-bot==20.0
+aiohttp
+beautifulsoup4
+requests
+pillow
+reportlab
