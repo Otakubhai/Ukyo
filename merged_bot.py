@@ -18,7 +18,7 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Fetch bot token
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("7373649479:AAE_YWsMvbOmURGIOuRtv-o0S1chuYiBnm4")
 
 # Use temp directory instead of persistent storage
 TEMP_DIR = tempfile.gettempdir()
