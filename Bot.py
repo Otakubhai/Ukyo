@@ -12,7 +12,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 
 # Folder to store images
 DOWNLOAD_DIR = "downloads"
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)  # Ensure the directory exists
 
 # Define conversation states
 WAITING_FOR_NUMBER = 1
@@ -92,14 +92,15 @@ async def fetch_gallery(update: Update, context):
             with open(img_path, "rb") as img_file:
                 await update.message.reply_document(document=img_file)
 
+        # Generate PDF and send it
         pdf_path = os.path.join(DOWNLOAD_DIR, "output.pdf")
-        pdf_created = create_pdf(image_paths, pdf_path)
+        pdf_path = create_pdf(image_paths, pdf_path)
 
-        if pdf_created:
-            async with open(pdf_path, "rb") as pdf_file:
+        if pdf_path and os.path.exists(pdf_path):  # Check if file exists
+            with open(pdf_path, "rb") as pdf_file:
                 await update.message.reply_document(document=pdf_file, caption="Here is your PDF!")
         else:
-            await update.message.reply_text("Failed to create PDF.")
+            await update.message.reply_text("PDF generation failed. Please try again.")
 
     except ValueError:
         await update.message.reply_text("Invalid number. Please enter a valid number.")
