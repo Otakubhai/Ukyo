@@ -10,11 +10,11 @@ import logging
 import gc
 
 # Import PDF generation function
-from pdf_generator import create_pdf
+from optimized_pdf_generator import create_pdf  # Fixed import
 
 # Configure logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
     handlers=[
         logging.StreamHandler(),
@@ -126,7 +126,6 @@ async def get_doujin(update: Update, context: CallbackContext) -> None:
     status_message = await update.message.reply_text("Fetching images... This may take a while depending on the size.")
     
     try:
-        # Create a unique folder for this request
         request_id = f"doujin_{hash(url) % 10000}"
         request_dir = os.path.join(TEMP_DIR, request_id)
         os.makedirs(request_dir, exist_ok=True)
@@ -141,7 +140,6 @@ async def get_doujin(update: Update, context: CallbackContext) -> None:
         total_images = len(image_urls)
         await status_message.edit_text(f"Found {total_images} images. Downloading...")
         
-        # Download images
         image_paths = await download_images(image_urls, request_dir, status_message)
 
         if not image_paths:
@@ -150,11 +148,9 @@ async def get_doujin(update: Update, context: CallbackContext) -> None:
 
         await status_message.edit_text("Generating PDF... This may take a moment.")
         
-        # Generate PDF
         pdf_path = os.path.join(request_dir, f"{request_id}.pdf")
         create_pdf(image_paths, pdf_path)
 
-        # Send PDF to user
         await status_message.edit_text("PDF created! Sending to you now...")
         
         with open(pdf_path, "rb") as pdf_file:
@@ -167,9 +163,8 @@ async def get_doujin(update: Update, context: CallbackContext) -> None:
 
     except Exception as e:
         logger.error(f"Error processing doujin: {e}")
-        await update.message.reply_text(f"An error occurred while processing the request: {str(e)}")
+        await update.message.reply_text(f"An error occurred: {str(e)}")
     finally:
-        # Clean up
         try:
             import shutil
             if os.path.exists(request_dir):
@@ -179,100 +174,15 @@ async def get_doujin(update: Update, context: CallbackContext) -> None:
         
         gc.collect()
 
-async def scrape_images(url: str):
-    """Scrapes all image URLs from the given Multporn.net page asynchronously."""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
-    
-    try:
-        timeout = aiohttp.ClientTimeout(total=60)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, headers=headers) as response:
-                if response.status != 200:
-                    logger.error(f"Failed to fetch page: HTTP {response.status}")
-                    return None
-                
-                html_content = await response.text()
-        
-        soup = BeautifulSoup(html_content, "html.parser")
-        image_tags = soup.find_all("img")
-        
-        image_urls = []
-        for img in image_tags:
-            src = img.get("src")
-            if src and "uploads" in src:
-                if not src.startswith("http"):
-                    src = "https://multporn.net" + src
-                image_urls.append(src)
-                
-        logger.info(f"Found {len(image_urls)} images")
-        return image_urls
-    
-    except Exception as e:
-        logger.error(f"Error scraping images: {e}")
-        return None
-
-async def download_images(image_urls, output_dir, status_message=None):
-    """Downloads images asynchronously and returns a list of local file paths."""
-    image_paths = []
-    total = len(image_urls)
-    completed = 0
-    
-    sem = asyncio.Semaphore(10)  # Limit concurrent downloads
-    
-    async def download_image(url, index):
-        nonlocal completed
-        
-        async with sem:
-            try:
-                timeout = aiohttp.ClientTimeout(total=30)
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-                
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.get(url, headers=headers) as response:
-                        if response.status == 200:
-                            img_path = os.path.join(output_dir, f"image_{index:03d}.jpg")
-                            with open(img_path, "wb") as f:
-                                f.write(await response.read())
-                            
-                            # Validate the image
-                            try:
-                                with Image.open(img_path) as img:
-                                    img.verify()
-                                image_paths.append(img_path)
-                            except Exception as img_error:
-                                logger.error(f"Invalid image file: {img_error}")
-                                if os.path.exists(img_path):
-                                    os.remove(img_path)
-                        else:
-                            logger.error(f"Failed to download image {index}: HTTP {response.status}")
-            except Exception as e:
-                logger.error(f"Error downloading image {index}: {e}")
-            
-            completed += 1
-            if status_message and completed % 5 == 0:
-                try:
-                    await status_message.edit_text(f"Downloading images: {completed}/{total}")
-                except Exception:
-                    pass  # Ignore message editing errors
-    
-    # Create download tasks
-    tasks = [download_image(url, i) for i, url in enumerate(image_urls)]
-    await asyncio.gather(*tasks)
-    
-    # Sort by filename so images appear in the correct order
-    return sorted(image_paths)
-
 def main() -> None:
     """Main function to run the bot."""
     try:
         app = ApplicationBuilder().token(TOKEN).build()
         
-        # Register command handlers
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("anime", anime))
         app.add_handler(CommandHandler("get_doujin", get_doujin))
         
-        # Set up graceful shutdown
         import signal
         def shutdown_handler(signum, frame):
             logger.info("Received shutdown signal, exiting...")
