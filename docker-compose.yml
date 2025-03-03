@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  bot:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - /tmp:/tmp
+    deploy:
+      resources:
+        limits:
+          memory: 1G
