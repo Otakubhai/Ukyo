@@ -14,14 +14,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY . .
+COPY optimized_bot.py /app/
+COPY optimized_pdf_generator.py /app/
 
-# Create a volume for temporary storage
-VOLUME ["/tmp"]
-
-# Environment variables will be provided via docker-compose or command line
-ENV BOT_TOKEN=""
-ENV TEMP_DIR="/tmp"
-
-# Run the bot
-CMD ["python", "merged_bot.py"]
+# Set the command to run the bot script
+CMD ["python", "/app/optimized_bot.py"]
