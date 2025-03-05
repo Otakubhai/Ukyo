@@ -84,7 +84,7 @@ async def anime(update: Update, context: CallbackContext):
         "╰──────────────────────"
     )
 
-    await update.message.reply_photo(photo=image_url, caption=message_text)
+    await update.message.reply_photo(photo=image_url, caption=message_text, parse_mode='HTML')
 
 # Initialize bot
 app = ApplicationBuilder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
