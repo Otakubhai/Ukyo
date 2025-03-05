@@ -72,17 +72,15 @@ async def anime(update: Update, context: CallbackContext):
     anime_name = " ".join(context.args[1:])  # Get full anime name
     image_url = get_anime_image(anime_id)
     
-    message_text = (
-        f"💦 {anime_name}\n"
-        "╭──────────────────────\n"
-        "├ 📺 Episode : 01 - 06\n"
-        "├ 💾 Quality : 720p\n"
-        "├ 🎭 Genres: Hanime, Gamers\n"
-        "├ 🔊 Audio track : Sub\n"
-        "├ #Censored \n"
-        "├ #Recommendation +++++\n"
-        "╰──────────────────────"
-    )
+    message_text = f"""💦 {anime_name}
+╭──────────────────────
+├ 📺 Episode : 01 - 06
+├ 💾 Quality : 720p
+├ 🎭 Genres: Hanime, Gamers
+├ 🔊 Audio track : Sub
+├ #Censored
+├ #Recommendation +++++
+╰──────────────────────"""
 
     await update.message.reply_photo(photo=image_url, caption=message_text, parse_mode='HTML')
 
